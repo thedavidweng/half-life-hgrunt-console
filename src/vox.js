@@ -629,44 +629,64 @@ const sounds = {
   zulu: "zulu.wav",
 };
 
-function playWord(word) {
-  return new Promise((resolve, reject) => {
-    const audio = document.createElement("audio");
-    audio.style.display = "none";
-    document.body.appendChild(audio);
+let audioContext = null;
 
-    audio.src = "/vox/" + sounds[word];
+function getContext() {
+  if (audioContext == null) {
+    audioContext = new AudioContext();
+  }
+  // A context created before a user gesture starts suspended.
+  if (audioContext.state === "suspended") {
+    audioContext.resume();
+  }
+  return audioContext;
+}
 
-    audio.ontimeupdate = (ev) => {
-      if (audio.currentTime === audio.duration) {
-        audio.pause();
-        if (audio.parentNode != null) {
-          audio.parentNode.removeChild(audio);
-        }
-        resolve();
-      }
-    };
+const loadedAudioBuffersByWord = new Map();
 
-    audio.onerror = (err) => {
-      console.error(err);
-      document.body.removeChild(audio);
-      resolve();
-    };
+function loadAudioBufferForWord(word) {
+  let promise = loadedAudioBuffersByWord.get(word);
+  if (promise == null) {
+    const ctx = getContext();
+    promise = fetch("/vox/" + sounds[word])
+      .then((response) => response.arrayBuffer())
+      .then((data) => ctx.decodeAudioData(data))
+      .catch((err) => {
+        console.error(err);
+        loadedAudioBuffersByWord.delete(word);
+        return null;
+      });
+    loadedAudioBuffersByWord.set(word, promise);
+  }
+  return promise;
+}
 
-    audio.play();
-  });
+function playAudioBufferAt(buffer, startTime) {
+  const ctx = getContext();
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start(startTime);
 }
 
 const vox = {
   words: Object.keys(sounds),
-  playWord(word) {
-    return playWord(word);
+  async playWord(word) {
+    const buffer = await loadAudioBufferForWord(word);
+    if (buffer == null) return;
+    const ctx = getContext();
+    playAudioBufferAt(buffer, ctx.currentTime);
   },
   async playSentence(words) {
-    // False positive in eslint rule???
-    // eslint-disable-next-line no-unused-vars
-    for (let word of words) {
-      await playWord(word);
+    const buffers = await Promise.all(
+      words.map((word) => loadAudioBufferForWord(word))
+    );
+    const ctx = getContext();
+    let nextStart = ctx.currentTime;
+    for (const buffer of buffers) {
+      if (buffer == null) continue;
+      playAudioBufferAt(buffer, nextStart);
+      nextStart += buffer.duration;
     }
   },
 };
