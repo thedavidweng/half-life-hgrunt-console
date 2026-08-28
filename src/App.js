@@ -130,7 +130,7 @@ export default class App extends React.Component {
         <div className="title">
           <span>HECU Grunt Console</span>
           <a
-            href="https://github.com/suchipi/half-life-hgrunt-console"
+            href="https://github.com/thedavidweng/half-life-hgrunt-console"
             target="_blank"
             rel="noopener noreferrer"
           >
