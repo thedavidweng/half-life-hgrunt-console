@@ -190,9 +190,16 @@ body {
   pointer-events: none;
 }
 
-.play-sentence {
+.sentence-actions {
   margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
 
+.sentence-action {
+  flex: 1;
+
+  border: 1px solid;
   border-top-color: #667359;
   border-left-color: #667359;
   background-color: #445435;
@@ -203,6 +210,11 @@ body {
   padding: 4px;
   font-size: inherit;
   font-family: inherit;
+}
+
+.sentence-action:disabled {
+  color: rgba(255, 255, 255, 0.35);
+  cursor: default;
 }
 
 mark {

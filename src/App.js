@@ -21,6 +21,17 @@ function syncUrlState(tags) {
   urlState.set(tags.map((tag) => tag.id));
 }
 
+function toFileName(words) {
+  const slug = words
+    .join(" ")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+
+  return "hecu-grunt-" + (slug || "sentence") + ".wav";
+}
+
 function isSpecialWord(word) {
   return word.includes("_");
 }
@@ -79,6 +90,7 @@ export default class App extends React.Component {
     suggestions: hgrunt.words.map((word) => ({ id: word })),
     selectedIndex: null,
     dragIndex: null,
+    isDownloading: false,
   };
 
   handleDelete = (i) => {
@@ -195,6 +207,30 @@ export default class App extends React.Component {
     );
   };
 
+  handleDownload = async () => {
+    const words = this.state.tags.map((tag) => tag.id);
+    if (words.length === 0) return;
+
+    this.setState({ isDownloading: true });
+    try {
+      const wav = await hgrunt.getSentenceWav(words);
+      if (wav == null) return;
+
+      const url = URL.createObjectURL(wav);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = toFileName(words);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      this.setState({ isDownloading: false });
+    }
+  };
+
   handleDrag = (tag, currPos, newPos) => {
     const nextTags = this.state.tags.slice();
     const [movedTag] = nextTags.splice(currPos, 1);
@@ -295,23 +331,33 @@ export default class App extends React.Component {
             renderSuggestion={renderSuggestion}
           />
         </div>
-        <button
-          className="play-sentence"
-          onClick={() => {
-            const sentence = tags.map((tag) => tag.id);
-            hgrunt.playSentence(sentence);
-            this.setState(
-              {
-                history: [...history, sentence.join(" ")],
-              },
-              () => {
-                this.history.scrollTop = Number.MAX_SAFE_INTEGER;
-              }
-            );
-          }}
-        >
-          Play
-        </button>
+        <div className="sentence-actions">
+          <button
+            className="sentence-action"
+            disabled={tags.length === 0}
+            onClick={() => {
+              const sentence = tags.map((tag) => tag.id);
+              hgrunt.playSentence(sentence);
+              this.setState(
+                {
+                  history: [...history, sentence.join(" ")],
+                },
+                () => {
+                  this.history.scrollTop = Number.MAX_SAFE_INTEGER;
+                }
+              );
+            }}
+          >
+            Play
+          </button>
+          <button
+            className="sentence-action"
+            disabled={tags.length === 0 || this.state.isDownloading}
+            onClick={this.handleDownload}
+          >
+            {this.state.isDownloading ? "Rendering…" : "Download"}
+          </button>
+        </div>
       </>
     );
   }
