@@ -4,7 +4,7 @@ This is a website where you can make Half-Life's HECU Marine (Human Grunt) say s
 
 Check it out at https://thedavidweng.github.io/half-life-hgrunt-console
 
-<img width="597" alt="screenshot" src="https://user-images.githubusercontent.com/1341513/64526303-23577a00-d2c0-11e9-9441-84ced8fcbab3.png">
+<img width="597" alt="screenshot" src="screenshot.png">
 
 
 Forked from [suchipi/half-life-vox-console](https://github.com/suchipi/half-life-vox-console)
