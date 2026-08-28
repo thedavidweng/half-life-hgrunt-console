@@ -80,6 +80,29 @@ body {
   display: none;
 }
 
+/* Selected word: same sunken bevel as the history panel, no layout shift. */
+.ReactTags__tag--selected {
+  border-top-color: #1f2719;
+  border-left-color: #1f2719;
+  border-bottom-color: #687360;
+  border-right-color: #687360;
+  background-color: #2a3520;
+  color: white;
+}
+
+/* Drag placeholder: dashed ghost marking where the dragged word will land,
+   with a bright left edge as the insertion point. box-shadow keeps it from
+   shifting the layout. opacity is forced on because react-tag-input sets an
+   inline opacity: 0 before the word is first moved. */
+.ReactTags__tag--dragging {
+  opacity: 1 !important;
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.5);
+  background-color: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  box-shadow: -2px 0 0 rgba(255, 255, 255, 0.75);
+}
+
 .ReactTags__tagInput {
   flex-grow: 1;
   display: flex;
