@@ -1,8 +1,9 @@
 {
-  "name": "half-life-vox-console",
+  "name": "half-life-hgrunt-console",
   "version": "0.1.0",
   "private": true,
-  "repository": "suchipi/half-life-vox-console",
+  "repository": "thedavidweng/half-life-hgrunt-console",
+  "homepage": "https://thedavidweng.github.io/half-life-hgrunt-console",
   "dependencies": {
     "react": "^16.9.0",
     "react-boxxy": "^1.0.1",
