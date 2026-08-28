@@ -65,7 +65,6 @@ body {
 }
 
 .ReactTags__tag {
-  position: relative;
   margin: 1px;
   padding: 2px;
   border: 1px solid;
@@ -91,13 +90,11 @@ body {
   color: white;
 }
 
-/*
-  Drag placeholder: react-tag-input hides the dragged tag with opacity: 0 and
-  reorders the list live. We force it visible as a dashed ghost and add a bright
-  left edge to mark the exact insertion point. box-shadow avoids layout shift.
-*/
-.ReactTags__tag.tag-wrapper[style*="opacity: 0"],
-.ReactTags__tag.tag-wrapper[style*="opacity:0"] {
+/* Drag placeholder: dashed ghost marking where the dragged word will land,
+   with a bright left edge as the insertion point. box-shadow keeps it from
+   shifting the layout. opacity is forced on because react-tag-input sets an
+   inline opacity: 0 before the word is first moved. */
+.ReactTags__tag--dragging {
   opacity: 1 !important;
   border-style: dashed;
   border-color: rgba(255, 255, 255, 0.5);

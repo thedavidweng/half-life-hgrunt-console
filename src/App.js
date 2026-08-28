@@ -15,6 +15,7 @@ const KeyCodes = {
 const delimiters = [KeyCodes.comma, KeyCodes.enter, KeyCodes.space];
 
 const SELECTED_TAG_CLASS = "ReactTags__tag--selected";
+const DRAGGING_TAG_CLASS = "ReactTags__tag--dragging";
 
 function syncUrlState(tags) {
   urlState.set(tags.map((tag) => tag.id));
@@ -77,6 +78,7 @@ export default class App extends React.Component {
     })),
     suggestions: hgrunt.words.map((word) => ({ id: word })),
     selectedIndex: null,
+    dragIndex: null,
   };
 
   handleDelete = (i) => {
@@ -126,8 +128,36 @@ export default class App extends React.Component {
   };
 
   handleTagInputRef = (el) => {
+    this.tagInputWrapper = el;
     if (el) {
       el.addEventListener("keydown", this.handleTagInputKeyDown, true);
+    }
+  };
+
+  /*
+    react-tag-input keys each tag as `id + '-' + index`, so reordering unmounts
+    and remounts every tag. That throws away react-dnd's `isDragging` state, so
+    the library's own opacity: 0 hint disappears as soon as the word moves.
+    We track the dragged word's index ourselves instead.
+  */
+  handleDragStart = (event) => {
+    const tagEl = event.target.closest && event.target.closest(".ReactTags__tag");
+    if (!tagEl || !this.tagInputWrapper) return;
+
+    const tagEls = Array.prototype.slice.call(
+      this.tagInputWrapper.querySelectorAll(".ReactTags__tag")
+    );
+    const index = tagEls.indexOf(tagEl);
+    if (index === -1) return;
+
+    this.setState({ dragIndex: index });
+  };
+
+  // Listen on document: the source node is removed mid-drag, so dragend may
+  // never bubble through the tag wrapper.
+  handleDragEnd = () => {
+    if (this.state.dragIndex !== null) {
+      this.setState({ dragIndex: null });
     }
   };
 
@@ -169,24 +199,42 @@ export default class App extends React.Component {
     const nextTags = this.state.tags.slice();
     const [movedTag] = nextTags.splice(currPos, 1);
     nextTags.splice(newPos, 0, movedTag);
-    this.setState({ tags: nextTags, selectedIndex: null }, () => {
-      syncUrlState(this.state.tags);
-    });
+    // The dragged word now sits at newPos, so the placeholder follows it.
+    this.setState(
+      { tags: nextTags, selectedIndex: null, dragIndex: newPos },
+      () => {
+        syncUrlState(this.state.tags);
+      }
+    );
   };
 
   componentDidMount() {
     this.input = document.querySelector("input.ReactTags__tagInputField");
+    document.addEventListener("dragstart", this.handleDragStart);
+    document.addEventListener("dragend", this.handleDragEnd);
+    document.addEventListener("drop", this.handleDragEnd);
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener("dragstart", this.handleDragStart);
+    document.removeEventListener("dragend", this.handleDragEnd);
+    document.removeEventListener("drop", this.handleDragEnd);
   }
 
   render() {
-    const { tags, suggestions, history, selectedIndex } = this.state;
+    const { tags, suggestions, history, selectedIndex, dragIndex } = this.state;
 
-    // The selected tag gets a class name so it can be styled as pressed in.
-    const decoratedTags = tags.map((tag, index) =>
-      index === selectedIndex
-        ? { ...tag, className: SELECTED_TAG_CLASS }
-        : tag
-    );
+    // A dragged word is styled as an insertion placeholder; otherwise a
+    // selected word is styled as pressed in. Dragging wins when both apply.
+    const decoratedTags = tags.map((tag, index) => {
+      if (index === dragIndex) {
+        return { ...tag, className: DRAGGING_TAG_CLASS };
+      }
+      if (index === selectedIndex) {
+        return { ...tag, className: SELECTED_TAG_CLASS };
+      }
+      return tag;
+    });
 
     return (
       <>
