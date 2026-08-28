@@ -1,6 +1,6 @@
 import React from "react";
 import { WithContext as ReactTags } from "react-tag-input";
-import vox from "./vox";
+import hgrunt from "./hgrunt";
 import urlState from "./urlState";
 
 const KeyCodes = {
@@ -15,13 +15,62 @@ function syncUrlState(tags) {
   urlState.set(tags.map((tag) => tag.id));
 }
 
+function isSpecialWord(word) {
+  return word.includes("_");
+}
+
+function handleFilterSuggestions(query, suggestions) {
+  const lowerQuery = query.toLowerCase();
+
+  const normal = suggestions.filter(
+    (item) => !isSpecialWord(item.id) && item.id.toLowerCase().includes(lowerQuery)
+  );
+  const special = suggestions.filter(
+    (item) => isSpecialWord(item.id) && item.id.toLowerCase().includes(lowerQuery)
+  );
+
+  const result = [...normal];
+  if (special.length > 0) {
+    result.push({ id: "---", isDivider: true });
+    result.push(...special);
+  }
+
+  return result;
+}
+
+function renderSuggestion(item, query) {
+  if (item.isDivider) {
+    return <div className="suggestion-divider" />;
+  }
+
+  const labelValue = item.id;
+  if (!query || !query.trim()) {
+    return <span>{labelValue}</span>;
+  }
+
+  const escapedRegex = query
+    .trim()
+    .replace(/[-\\\\^$*+?.()|[\]{}]/g, "\\$&");
+  const html = labelValue.replace(new RegExp(escapedRegex, "gi"), (x) => {
+    const escaped = x
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+    return `<mark>${escaped}</mark>`;
+  });
+
+  return <span dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 export default class App extends React.Component {
   state = {
     history: [],
     tags: urlState.get().map((word) => ({
       id: word.toLowerCase(),
     })),
-    suggestions: vox.words.map((word) => ({ id: word })),
+    suggestions: hgrunt.words.map((word) => ({ id: word })),
   };
 
   handleDelete = (i) => {
@@ -37,12 +86,14 @@ export default class App extends React.Component {
   };
 
   handleAddition = (tag) => {
+    if (tag.id === "---") return;
+
     const word = tag.id.toLowerCase();
 
-    if (!vox.words.includes(word)) {
+    if (!hgrunt.words.includes(word)) {
       return;
     }
-    vox.playWord(word);
+    hgrunt.playWord(word);
 
     this.setState(
       (state) => ({
@@ -61,11 +112,8 @@ export default class App extends React.Component {
 
   handleDrag = (tag, currPos, newPos) => {
     const nextTags = this.state.tags.slice();
-
     nextTags.splice(currPos, 1);
     nextTags.splice(newPos, 0, tag);
-
-    // re-render
     this.setState({ tags: nextTags }, () => {
       syncUrlState(this.state.tags);
     });
@@ -80,9 +128,9 @@ export default class App extends React.Component {
     return (
       <>
         <div className="title">
-          <span>VOX Console</span>
+          <span>HECU Grunt Console</span>
           <a
-            href="https://github.com/suchipi/half-life-vox-console"
+            href="https://github.com/suchipi/half-life-hgrunt-console"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -96,13 +144,12 @@ export default class App extends React.Component {
           }}
         >
           {history.map((sentence, index) => (
-            /* eslint-disable-next-line jsx-a11y/anchor-is-valid */
             <a
               className="history-item"
               key={index}
               onClick={() => {
                 const sentenceArray = sentence.toLowerCase().split(" ");
-                vox.playSentence(sentenceArray);
+                hgrunt.playSentence(sentenceArray);
                 this.setState(
                   {
                     tags: sentenceArray.map((word) => ({ id: word })),
@@ -119,7 +166,7 @@ export default class App extends React.Component {
         </code>
         <div className="tag-input-wrapper">
           <ReactTags
-            placeholder={tags.length === 0 ? "Make the VOX speak..." : ""}
+            placeholder={tags.length === 0 ? "Make the Grunt speak..." : ""}
             labelField="id"
             minQueryLength={0}
             allowUnique={false}
@@ -129,13 +176,15 @@ export default class App extends React.Component {
             handleAddition={this.handleAddition}
             handleDrag={this.handleDrag}
             delimiters={delimiters}
+            handleFilterSuggestions={handleFilterSuggestions}
+            renderSuggestion={renderSuggestion}
           />
         </div>
         <button
           className="play-sentence"
           onClick={() => {
             const sentence = tags.map((tag) => tag.id);
-            vox.playSentence(sentence);
+            hgrunt.playSentence(sentence);
             this.setState(
               {
                 history: [...history, sentence.join(" ")],

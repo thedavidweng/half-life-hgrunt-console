@@ -159,6 +159,14 @@ body {
   background-color: #445435;
 }
 
+.suggestion-divider {
+  height: 1px;
+  margin: 4px 0;
+  background-color: #1f2719;
+  border-top: 1px solid #687360;
+  pointer-events: none;
+}
+
 .play-sentence {
   margin-top: 8px;
 
