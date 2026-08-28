@@ -445,7 +445,6 @@ function resamplePcm(pcm, fromRate, toRate) {
 
 function mostCommonSampleRate(segments) {
   const counts = new Map();
-  // eslint-disable-next-line no-unused-vars
   for (const segment of segments) {
     counts.set(segment.sampleRate, (counts.get(segment.sampleRate) || 0) + 1);
   }
@@ -490,7 +489,6 @@ function encodeWav(parts, sampleRate, channels, bitsPerSample) {
   view.setUint32(40, dataSize, true);
 
   let offset = 44;
-  // eslint-disable-next-line no-unused-vars
   for (const part of parts) {
     new Uint8Array(buffer, offset, part.length).set(part);
     offset += part.length;
@@ -520,7 +518,6 @@ const hgrunt = {
     );
     const ctx = getContext();
     let nextStart = ctx.currentTime;
-    // eslint-disable-next-line no-unused-vars
     for (const buf of buffers) {
       if (buf == null) continue;
       playAudioBufferAt(buf, nextStart);
