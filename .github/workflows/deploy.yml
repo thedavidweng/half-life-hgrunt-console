@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - run: npm install
       - run: SKIP_PREFLIGHT_CHECK=true npm run build
+        env:
+          NODE_OPTIONS: --openssl-legacy-provider
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build
