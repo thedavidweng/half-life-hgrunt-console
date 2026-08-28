@@ -384,6 +384,7 @@ const hgrunt = {
     );
     const ctx = getContext();
     let nextStart = ctx.currentTime;
+    // eslint-disable-next-line no-unused-vars
     for (const buf of buffers) {
       if (buf == null) continue;
       playAudioBufferAt(buf, nextStart);

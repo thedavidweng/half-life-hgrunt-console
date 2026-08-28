@@ -131,6 +131,14 @@ export default class App extends React.Component {
     }
   };
 
+  // A selected word is an editing-mode concept; once the user starts typing a
+  // new word, clear the selection so suggestions and Backspace behave normally.
+  handleInputChange = (value) => {
+    if (this.state.selectedIndex !== null && value && value.trim() !== "") {
+      this.setState({ selectedIndex: null });
+    }
+  };
+
   handleAddition = (tag) => {
     if (tag.id === "---") return;
 
@@ -225,7 +233,7 @@ export default class App extends React.Component {
           <ReactTags
             placeholder={tags.length === 0 ? "Make the Grunt speak..." : ""}
             labelField="id"
-            minQueryLength={0}
+            minQueryLength={1}
             allowUnique={false}
             tags={decoratedTags}
             suggestions={suggestions}
@@ -233,6 +241,7 @@ export default class App extends React.Component {
             handleAddition={this.handleAddition}
             handleDrag={this.handleDrag}
             handleTagClick={this.handleTagClick}
+            handleInputChange={this.handleInputChange}
             delimiters={delimiters}
             handleFilterSuggestions={handleFilterSuggestions}
             renderSuggestion={renderSuggestion}
