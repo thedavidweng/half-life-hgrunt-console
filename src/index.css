@@ -80,6 +80,16 @@ body {
   display: none;
 }
 
+/* Selected word: same sunken bevel as the history panel, no layout shift. */
+.ReactTags__tag--selected {
+  border-top-color: #1f2719;
+  border-left-color: #1f2719;
+  border-bottom-color: #687360;
+  border-right-color: #687360;
+  background-color: #2a3520;
+  color: white;
+}
+
 .ReactTags__tagInput {
   flex-grow: 1;
   display: flex;

@@ -384,10 +384,10 @@ const hgrunt = {
     );
     const ctx = getContext();
     let nextStart = ctx.currentTime;
-    for (const buffer of buffers) {
-      if (buffer == null) continue;
-      playAudioBufferAt(buffer, nextStart);
-      nextStart += buffer.duration;
+    for (const buf of buffers) {
+      if (buf == null) continue;
+      playAudioBufferAt(buf, nextStart);
+      nextStart += buf.duration;
     }
   },
 };

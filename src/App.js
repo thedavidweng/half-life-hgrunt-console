@@ -7,9 +7,14 @@ const KeyCodes = {
   comma: 188,
   enter: 13,
   space: 32,
+  backspace: 8,
+  delete: 46,
+  escape: 27,
 };
 
 const delimiters = [KeyCodes.comma, KeyCodes.enter, KeyCodes.space];
+
+const SELECTED_TAG_CLASS = "ReactTags__tag--selected";
 
 function syncUrlState(tags) {
   urlState.set(tags.map((tag) => tag.id));
@@ -71,6 +76,7 @@ export default class App extends React.Component {
       id: word.toLowerCase(),
     })),
     suggestions: hgrunt.words.map((word) => ({ id: word })),
+    selectedIndex: null,
   };
 
   handleDelete = (i) => {
@@ -78,11 +84,51 @@ export default class App extends React.Component {
     this.setState(
       {
         tags: tags.filter((tag, index) => index !== i),
+        selectedIndex: null,
       },
       () => {
         syncUrlState(this.state.tags);
+        if (this.input) {
+          this.input.focus();
+        }
       }
     );
+  };
+
+  handleTagClick = (i) => {
+    this.setState((state) => ({
+      selectedIndex: state.selectedIndex === i ? null : i,
+    }));
+  };
+
+  // Runs in the capture phase so that Backspace/Delete on a selected word is
+  // handled here instead of by ReactTags, which always drops the last tag.
+  handleTagInputKeyDown = (event) => {
+    const { selectedIndex } = this.state;
+
+    if (selectedIndex === null) return;
+
+    if (event.keyCode === KeyCodes.escape) {
+      this.setState({ selectedIndex: null });
+      return;
+    }
+
+    const isDeleteKey =
+      event.keyCode === KeyCodes.backspace || event.keyCode === KeyCodes.delete;
+    if (!isDeleteKey) return;
+
+    // Let the browser edit whatever is already typed in.
+    if (this.input && this.input.value !== "") return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    this.handleDelete(selectedIndex);
+  };
+
+  handleTagInputRef = (el) => {
+    if (el) {
+      el.addEventListener("keydown", this.handleTagInputKeyDown, true);
+    }
   };
 
   handleAddition = (tag) => {
@@ -99,6 +145,7 @@ export default class App extends React.Component {
       (state) => ({
         tags: [...state.tags, tag],
         history: [...state.history, word],
+        selectedIndex: null,
       }),
       () => {
         syncUrlState(this.state.tags);
@@ -112,9 +159,9 @@ export default class App extends React.Component {
 
   handleDrag = (tag, currPos, newPos) => {
     const nextTags = this.state.tags.slice();
-    nextTags.splice(currPos, 1);
-    nextTags.splice(newPos, 0, tag);
-    this.setState({ tags: nextTags }, () => {
+    const [movedTag] = nextTags.splice(currPos, 1);
+    nextTags.splice(newPos, 0, movedTag);
+    this.setState({ tags: nextTags, selectedIndex: null }, () => {
       syncUrlState(this.state.tags);
     });
   };
@@ -124,7 +171,15 @@ export default class App extends React.Component {
   }
 
   render() {
-    const { tags, suggestions, history } = this.state;
+    const { tags, suggestions, history, selectedIndex } = this.state;
+
+    // The selected tag gets a class name so it can be styled as pressed in.
+    const decoratedTags = tags.map((tag, index) =>
+      index === selectedIndex
+        ? { ...tag, className: SELECTED_TAG_CLASS }
+        : tag
+    );
+
     return (
       <>
         <div className="title">
@@ -144,6 +199,7 @@ export default class App extends React.Component {
           }}
         >
           {history.map((sentence, index) => (
+            /* eslint-disable-next-line jsx-a11y/anchor-is-valid */
             <a
               className="history-item"
               key={index}
@@ -153,6 +209,7 @@ export default class App extends React.Component {
                 this.setState(
                   {
                     tags: sentenceArray.map((word) => ({ id: word })),
+                    selectedIndex: null,
                   },
                   () => {
                     syncUrlState(this.state.tags);
@@ -164,17 +221,18 @@ export default class App extends React.Component {
             </a>
           ))}
         </code>
-        <div className="tag-input-wrapper">
+        <div className="tag-input-wrapper" ref={this.handleTagInputRef}>
           <ReactTags
             placeholder={tags.length === 0 ? "Make the Grunt speak..." : ""}
             labelField="id"
             minQueryLength={0}
             allowUnique={false}
-            tags={tags}
+            tags={decoratedTags}
             suggestions={suggestions}
             handleDelete={this.handleDelete}
             handleAddition={this.handleAddition}
             handleDrag={this.handleDrag}
+            handleTagClick={this.handleTagClick}
             delimiters={delimiters}
             handleFilterSuggestions={handleFilterSuggestions}
             renderSuggestion={renderSuggestion}
