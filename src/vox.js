@@ -814,11 +814,11 @@ const vox = {
     );
     const ctx = getContext();
     let nextStart = ctx.currentTime;
-    for (const buffer of buffers) {
-      if (buffer == null) continue;
+    buffers.forEach((buffer) => {
+      if (buffer == null) return;
       playAudioBufferAt(buffer, nextStart);
       nextStart += buffer.duration;
-    }
+    });
   },
   // Joins the words into one WAV by concatenating their PCM data. Nothing is
   // decoded or re-encoded, so the download is bit-for-bit the same audio the
