@@ -181,6 +181,19 @@ export default class App extends React.Component {
     }
   };
 
+  // Only surface candidate words when the user is actively appending at the end
+  // of the input. When a word chip is selected (delete mode) we keep the
+  // suggestion list hidden, and we also hide it whenever the caret is parked in
+  // the middle of typed text rather than at the end.
+  shouldRenderSuggestions = () => {
+    if (this.state.selectedIndex !== null) return false;
+
+    const input = this.input;
+    if (!input || document.activeElement !== input) return false;
+
+    return input.selectionStart === input.value.length;
+  };
+
   handleAddition = (tag) => {
     if (tag.id === "---") return;
 
@@ -317,8 +330,9 @@ export default class App extends React.Component {
           <ReactTags
             placeholder={tags.length === 0 ? "Make the Grunt speak..." : ""}
             labelField="id"
-            minQueryLength={1}
+            minQueryLength={0}
             allowUnique={false}
+            shouldRenderSuggestions={this.shouldRenderSuggestions}
             tags={decoratedTags}
             suggestions={suggestions}
             handleDelete={this.handleDelete}
