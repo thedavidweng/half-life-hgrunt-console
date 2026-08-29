@@ -15,6 +15,17 @@ function syncUrlState(tags) {
   urlState.set(tags.map((tag) => tag.id));
 }
 
+function toFileName(words) {
+  const slug = words
+    .join(" ")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+
+  return "vox-" + (slug || "sentence") + ".wav";
+}
+
 export default class App extends React.Component {
   state = {
     history: [],
@@ -22,6 +33,7 @@ export default class App extends React.Component {
       id: word.toLowerCase(),
     })),
     suggestions: vox.words.map((word) => ({ id: word })),
+    isDownloading: false,
   };
 
   handleDelete = (i) => {
@@ -69,6 +81,30 @@ export default class App extends React.Component {
     this.setState({ tags: nextTags }, () => {
       syncUrlState(this.state.tags);
     });
+  };
+
+  handleDownload = async () => {
+    const words = this.state.tags.map((tag) => tag.id);
+    if (words.length === 0) return;
+
+    this.setState({ isDownloading: true });
+    try {
+      const wav = await vox.getSentenceWav(words);
+      if (wav == null) return;
+
+      const url = URL.createObjectURL(wav);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = toFileName(words);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      this.setState({ isDownloading: false });
+    }
   };
 
   componentDidMount() {
@@ -147,6 +183,13 @@ export default class App extends React.Component {
           }}
         >
           Play
+        </button>
+        <button
+          className="download"
+          disabled={tags.length === 0 || this.state.isDownloading}
+          onClick={this.handleDownload}
+        >
+          {this.state.isDownloading ? "Rendering…" : "Download"}
         </button>
       </>
     );

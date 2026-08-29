@@ -669,6 +669,137 @@ function playAudioBufferAt(buffer, startTime) {
   source.start(startTime);
 }
 
+const loadedWordFilesByWord = new Map();
+
+function loadWordFile(word) {
+  let promise = loadedWordFilesByWord.get(word);
+  if (promise == null) {
+    promise = fetch("/vox/" + sounds[word])
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch " + sounds[word]);
+        }
+        return response.arrayBuffer();
+      })
+      .catch((err) => {
+        console.error(err);
+        loadedWordFilesByWord.delete(word);
+        return null;
+      });
+    loadedWordFilesByWord.set(word, promise);
+  }
+  return promise;
+}
+
+// Pulls the format and the raw PCM bytes out of a WAV. No decoding happens
+// here: the samples stay exactly as they are on disk.
+function parseWav(arrayBuffer) {
+  const view = new DataView(arrayBuffer);
+  if (view.getUint32(0, false) !== 0x52494646) return null; // "RIFF"
+  if (view.getUint32(8, false) !== 0x57415645) return null; // "WAVE"
+
+  let format = null;
+  let pcm = null;
+  let offset = 12;
+  while (offset + 8 <= view.byteLength) {
+    const chunkId = view.getUint32(offset, false);
+    const chunkSize = view.getUint32(offset + 4, true);
+    const body = offset + 8;
+
+    if (chunkId === 0x666d7420 && chunkSize >= 16) {
+      // "fmt "
+      format = {
+        channels: view.getUint16(body + 2, true),
+        sampleRate: view.getUint32(body + 4, true),
+        bitsPerSample: view.getUint16(body + 14, true),
+      };
+    } else if (chunkId === 0x64617461) {
+      // "data"
+      pcm = new Uint8Array(
+        arrayBuffer,
+        body,
+        Math.min(chunkSize, view.byteLength - body)
+      );
+    }
+
+    offset = body + chunkSize + (chunkSize % 2);
+  }
+
+  if (format == null || pcm == null) return null;
+  return { ...format, pcm };
+}
+
+// Linear interpolation over samples. Only needed for the handful of effects
+// that were recorded at a different sample rate than the speech.
+function resamplePcm(pcm, fromRate, toRate) {
+  if (fromRate === toRate) return pcm;
+
+  const ratio = toRate / fromRate;
+  const resampled = new Uint8Array(Math.floor(pcm.length * ratio));
+  for (let i = 0; i < resampled.length; i++) {
+    const position = i / ratio;
+    const left = Math.floor(position);
+    const right = Math.min(left + 1, pcm.length - 1);
+    const weight = position - left;
+    resampled[i] = Math.round(pcm[left] * (1 - weight) + pcm[right] * weight);
+  }
+  return resampled;
+}
+
+function mostCommonSampleRate(segments) {
+  const counts = new Map();
+  for (let i = 0; i < segments.length; i++) {
+    const rate = segments[i].sampleRate;
+    counts.set(rate, (counts.get(rate) || 0) + 1);
+  }
+
+  let best = segments[0].sampleRate;
+  let bestCount = 0;
+  counts.forEach((count, rate) => {
+    if (count > bestCount || (count === bestCount && rate < best)) {
+      best = rate;
+      bestCount = count;
+    }
+  });
+  return best;
+}
+
+// Wraps the joined samples in a single WAV header. Again, no encoding: the
+// samples are copied straight through into the data chunk.
+function encodeWav(parts, sampleRate, channels, bitsPerSample) {
+  const dataSize = parts.reduce((total, part) => total + part.length, 0);
+  const blockAlign = channels * (bitsPerSample / 8);
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  function writeAscii(offset, text) {
+    for (let i = 0; i < text.length; i++) {
+      view.setUint8(offset + i, text.charCodeAt(i));
+    }
+  }
+
+  writeAscii(0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(8, "WAVE");
+  writeAscii(12, "fmt ");
+  view.setUint32(16, 16, true); // PCM fmt chunk is always 16 bytes
+  view.setUint16(20, 1, true); // format: PCM
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true); // byte rate
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  writeAscii(36, "data");
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+  for (let i = 0; i < parts.length; i++) {
+    new Uint8Array(buffer, offset, parts[i].length).set(parts[i]);
+    offset += parts[i].length;
+  }
+  return buffer;
+}
+
 const vox = {
   words: Object.keys(sounds),
   async playWord(word) {
@@ -688,6 +819,33 @@ const vox = {
       playAudioBufferAt(buffer, nextStart);
       nextStart += buffer.duration;
     }
+  },
+  // Joins the words into one WAV by concatenating their PCM data. Nothing is
+  // decoded or re-encoded, so the download is bit-for-bit the same audio the
+  // site plays. Returns null when none of the words could be loaded.
+  async getSentenceWav(words) {
+    const files = await Promise.all(words.map(loadWordFile));
+    const segments = files.map((file) => file && parseWav(file)).filter(Boolean);
+    if (segments.length === 0) return null;
+
+    const { channels, bitsPerSample } = segments[0];
+    const mismatched = segments.some(
+      (segment) =>
+        segment.channels !== channels ||
+        segment.bitsPerSample !== bitsPerSample
+    );
+    if (mismatched) {
+      throw new Error("Cannot join words with different channel or bit depths");
+    }
+
+    const sampleRate = mostCommonSampleRate(segments);
+    const parts = segments.map((segment) =>
+      resamplePcm(segment.pcm, segment.sampleRate, sampleRate)
+    );
+
+    return new Blob([encodeWav(parts, sampleRate, channels, bitsPerSample)], {
+      type: "audio/wav",
+    });
   },
 };
 
